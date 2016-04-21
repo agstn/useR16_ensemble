@@ -51,18 +51,25 @@ fit <- h2o.ensemble(x = x, y = y,
 perf <- h2o.ensemble_performance(fit, newdata = test)
 print(perf)
 
-# To access results directly: 
+# New metalerner
+fit2 <- h2o.metalearn(fit, metalearner = "h2o.deeplearning.wrapper")
 
-# Ensemble test set AUC
-perf$ensemble@metrics$AUC
+# Compute test set performance:
+perf2 <- h2o.ensemble_performance(fit2, newdata = test)
+print(perf2)
 
-# Base learner test set AUC (for comparison)
-L <- length(learner)
-auc <- sapply(seq(L), function(l) perf$base[[l]]@metrics$AUC)
-data.frame(learner, auc)
+# Run loop with metalerners
+metalearner <- c("h2o.glm_nn",
+                 "h2o.glm.wrapper", "h2o.randomForest.wrapper", 
+                 "h2o.gbm.wrapper", "h2o.deeplearning.wrapper")
+L           <- length(metalearner)
+fit2      <- vector("list", L)
+perf2     <- vector("list", L)
 
-# If desired, you can generate predictions on the test set
-# This is useful if you need to calculate custom performance metrics in R (not provided by H2O)
-pp <- predict(fit, test)
-predictions <- as.data.frame(pp$pred)[,3]  #third column, p1 is P(Y==1)
-labels <- as.data.frame(test[,y])[,1]
+for (i in seq_along(metalearner)) {
+  fit2[[i]]  <- h2o.metalearn(fit, metalearner = metalearner[[i]])
+  perf2[[i]] <- h2o.ensemble_performance(fit2[[i]], newdata = test)
+}
+
+auc <- sapply(seq(L), function(l) perf2[[l]]$ensemble@metrics$AUC)
+data.frame(metalearner, auc)
