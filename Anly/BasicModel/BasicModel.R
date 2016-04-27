@@ -18,7 +18,7 @@ train[,y] <- as.factor(train[,y])
 
 # Send data to h2o
 train <- as.h2o(train)
-test  <- as.h2o(train)
+test  <- as.h2o(test)
 
 # Specify the base learner library & the metalearner
 # learner <- c("h2o.glm.wrapper", "h2o.randomForest.wrapper", 
@@ -48,7 +48,7 @@ fit <- h2o.ensemble(x = x, y = y,
 # fit <- h2o.load_ensemble(path = "~/useR16_ensemble/Anly/BasicModel")
 
 # Compute test set performance:
-perf <- h2o.ensemble_performance(fit, newdata = test)
+perf <- h2o.ensemble_performance(fit, newdata = train)
 print(perf)
 
 # To access results directly: 

@@ -49,12 +49,12 @@ h2o_cv <- function(data, Y, K=5, B=1, seed=1000){
       train[,y] <- as.factor(train[,y])  
       
       #' fit the ensemble
-      fit <- h2o.ensemble(x = x, y = y,
+      fit <- h2o.ensemble(x = model$x, y = model$y,
                           training_frame = train,
-                          family = family,
-                          learner = learner,
-                          metalearner = metalearner,
-                          cvControl = list(V = nCV, shuffle = TRUE))
+                          family = model$family,
+                          learner = model$learner,
+                          metalearner = model$metalearner,
+                          cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$suffle))
       
       #' Predict on validation set
       predicted <- as.vector(predict(fit,valid)$pred$predict)
@@ -72,6 +72,13 @@ h2o_cv <- function(data, Y, K=5, B=1, seed=1000){
   return(results)
 }
 
+h2o.getFrame(fit$metafit@parameters$training_frame)
+h2o.getFrame(fit$basefits[[1]]@parameters$training_frame)
+
+fit$metafit@parameters$training_frame
+
 train0_sub <- train0[1:1000,]  ### make dataset small for development
 results  <- h2o_cv(data=train0_sub, Y='TARGET', K=5, B=2, seed=1000)
+
+results  <- h2o_cv(model = fit, K=5, B=2, seed=1000)
   
