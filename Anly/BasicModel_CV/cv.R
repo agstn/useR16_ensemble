@@ -25,30 +25,23 @@ h2o.glm_nn <- function(..., non_negative = TRUE) h2o.glm.wrapper(..., non_negati
 metalearner <- "h2o.glm.wrapper" 
 
 
-Y <- 'TARGET'
-train0_sub <- train0[1:500,]  ### make dataset small for development
-data <- train0_sub  
-K <- 5 
-B <- 1
-
 #' cross validation
-#' 
 
-h2o_cv <- function(data, Y, K=5, B=1){
-  results <- data.frame('repeatnum'=NA, 'foldnum'=NA, 'error'=NA)
+h2o_cv <- function(data, Y, K=5, B=1, seed=1000){
+ 
+   results <- data.frame('repeatnum'=NA, 'foldnum'=NA, 'error'=NA)
   n <- 1
   
+  set.seed(seed)
+  ind <- caret::createMultiFolds(data[,Y], k = K, times=B)
+  
+  data.h2o <- as.h2o(data)
+  
   for (b in 1:B){
-    
-    set.seed(352*B)
-    ind <- caret::createFolds(data[,Y], k = K, list = TRUE, returnTrain = FALSE)
-    
-    data.h2o <- as.h2o(data)
-    
     for (k in 1:K) {
       
-      train <- data.h2o[-ind[[1]],]
-      valid <- data.h2o[ind[[1]],]
+      train <- data.h2o[-ind[[b*k]],]
+      valid <- data.h2o[ind[[b*k]],]
       
       #' Find X & Y
       y <- Y
@@ -79,5 +72,6 @@ h2o_cv <- function(data, Y, K=5, B=1){
   return(results)
 }
 
-results  <- h2o_cv(data=train0, Y='TARGET', K=5, B=1)
+train0_sub <- train0[1:1000,]  ### make dataset small for development
+results  <- h2o_cv(data=train0_sub, Y='TARGET', K=5, B=2, seed=1000)
   
