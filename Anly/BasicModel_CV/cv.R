@@ -20,6 +20,9 @@ train[,y] <- as.factor(train[,y])
 train <- as.h2o(train)
 test  <- as.h2o(test)
 
+# Subset data
+train <- train[1:1000,]
+test  <- test[1:1000,]
 
 #' Specify the base learner library & the metalearner
 h2o.glm.1 <- function(..., alpha = 0.00, solver='L_BFGS') h2o.glm.wrapper(..., alpha = alpha, solver = solver)
@@ -33,42 +36,56 @@ h2o.glm_nn <- function(..., non_negative = TRUE) h2o.glm.wrapper(..., non_negati
 
 # Train the ensemble using 5-fold CV to generate level-one data
 # More CV folds will take longer to train, but should increase performance
-fit <- h2o.ensemble(x = x, y = y, 
+fit <- h2o.ensemble(x = x, y = y,
+                    model_id = "abcdf",
                     training_frame = train, 
                     family = family, 
                     learner = learner, 
                     metalearner = "h2o.glm_nn",
                     cvControl = list(V = nfolds , shuffle = TRUE))
 
-h2o.getFrame(model$basefits[[1]]@parameters$training_frame)
-Y <- fit$basefits[[1]]@parameters$y
 
+# h2o.getFrame(fit$basefits[[1]]@parameters$training_frame)
+# 
+# fit$basefits[[1]]@parameters$y
+# 
+# fit$basefits[[1]]@parameters$training_frame
+# fit$basefits[[1]]@allparameters$training_frame
+# fit$metafit@parameters$training_frame
+# 
+# sink("sink-examp.txt")
+# str(fit)
+# sink()
+# unlink("sink-examp.txt")
 
 #' cross validation
+#' 
+model = fit
+K=3 
+B=2 
+seed=1000
 
 h2o_cv <- function(model, K=5, B=1, seed=1000){
- 
+  
   results <- data.frame('repeatnum'=NA, 'foldnum'=NA, 'error'=NA)
   n <- 1
   
   d <- h2o.getFrame(model$basefits[[1]]@parameters$training_frame)
-
-  set.seed(seed)
-  ind <- caret::createMultiFolds(d[,model$y], k = K, times=B)
+  d <- d[,-length(d)]
   
-#  data.h2o <- as.h2o(data)
+  set.seed(seed)
+  ind <- caret::createMultiFolds(as.vector(d[,model$y]), k = K, times=B)
   
   for (b in 1:B){
     for (k in 1:K) {
       
-      
-      train <- d[-ind[[b*k]],]
-      valid <- d[ind[[b*k]],]
+      train <- d[ ind[[b*k]],]
+      valid <- d[-ind[[b*k]],]
       
       #' Find X & Y
-    # y <- Y
-      x <- setdiff(names(train), model$y)
-      train[,model$y] <- as.factor(train[,model$y])  
+      # y <- Y
+      #x <- setdiff(names(train), model$y)
+      #train[,model$y] <- as.factor(train[,model$y])  
       
       #' fit the ensemble
       fit <- h2o.ensemble(x = model$x, y = model$y,
@@ -95,8 +112,5 @@ h2o_cv <- function(model, K=5, B=1, seed=1000){
 }
 
 
-train0_sub <- train0[1:1000,]  ### make dataset small for development
-results  <- h2o_cv(data=train0_sub, Y='TARGET', K=5, B=2, seed=1000)
-
 results  <- h2o_cv(model = fit, K=5, B=2, seed=1000)
-  
+
