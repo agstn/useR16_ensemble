@@ -37,22 +37,12 @@ h2o.glm_nn <- function(..., non_negative = TRUE) h2o.glm.wrapper(..., non_negati
 # Train the ensemble using 5-fold CV to generate level-one data
 # More CV folds will take longer to train, but should increase performance
 fit <- h2o.ensemble(x = x, y = y,
-                    model_id = "abcdf",
                     training_frame = train, 
                     family = family, 
                     learner = learner, 
                     metalearner = "h2o.glm_nn",
                     cvControl = list(V = nfolds , shuffle = TRUE))
 
-
-# h2o.getFrame(fit$basefits[[1]]@parameters$training_frame)
-# 
-# fit$basefits[[1]]@parameters$y
-# 
-# fit$basefits[[1]]@parameters$training_frame
-# fit$basefits[[1]]@allparameters$training_frame
-# fit$metafit@parameters$training_frame
-# 
 # sink("sink-examp.txt")
 # str(fit)
 # sink()
@@ -67,7 +57,9 @@ seed=1000
 
 h2o_cv <- function(model, K=5, B=1, seed=1000){
   
-  results <- data.frame('repeatnum'=NA, 'foldnum'=NA, 'error'=NA)
+  results <- data.frame('repeatnum'=NA, 'foldnum'=NA, 'error'=NA,
+                        'MSE'=NA, 'r2'=NA, 'logloss'=NA, 'AUC'=NA, 
+                        'Gini'=NA, 'residual_deviance'=NA, 'null_deviance'=NA, 'AIC'=NA )
   n <- 1
   
   d <- h2o.getFrame(model$basefits[[1]]@parameters$training_frame)
@@ -79,7 +71,7 @@ h2o_cv <- function(model, K=5, B=1, seed=1000){
   for (b in 1:B){
     for (k in 1:K) {
       
-      train <- d[ ind[[b*k]],]
+      train <- d[ind[[b*k]],]
       valid <- d[-ind[[b*k]],]
       
       #' Find X & Y
@@ -94,8 +86,7 @@ h2o_cv <- function(model, K=5, B=1, seed=1000){
                           learner = model$learner,
                           metalearner = model$metalearner,
                           cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))
-      
-      #' Predict on validation set
+
       predicted <- as.vector(predict(fit,valid)$pred$predict)
       compare <- data.frame('predicted'=predicted, 'observed'=as.vector(valid[,y]))
       compare$match <- I(compare$predicted==compare$observed)
@@ -103,6 +94,20 @@ h2o_cv <- function(model, K=5, B=1, seed=1000){
       results[n, 'repeatnum'] <- b
       results[n, 'foldnum'] <- k
       results[n, 'error'] <- sum(compare$match)/length(compare$match)
+      
+      #' Predict on validation set
+      perf <- h2o.ensemble_performance(fit, newdata = valid)$ensemble@metrics
+       
+      results[n, 'MSE'] <- perf$MSE                           
+      results[n, 'r2'] <- perf$r2                        
+      results[n, 'logloss'] <- perf$logloss                       
+      results[n, 'AUC'] <- perf$AUC                           
+      results[n, 'Gini'] <- perf$Gini
+      results[n, 'residual_deviance'] <- perf$residual_deviance
+      results[n, 'null_deviance'] <- perf$null_deviance
+      results[n, 'AIC'] <- perf$AIC
+
+      
       
       n <- n+1
     }
