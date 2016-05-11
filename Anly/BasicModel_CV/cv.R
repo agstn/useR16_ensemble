@@ -1,15 +1,31 @@
+# Ideas for imporvments
+# 1- Add a parameter to export the results of the cross validation
+# 2- Create a function process the resutls of the cross validation
+# 3- Add a parameter to processed different metalernears
+
 # Package: Requires version >=0.1.8 of h2oEnsemble 
 pacman::p_load(h2oEnsemble)
 
 # Suppress warnings
 options(warn=-1)
+h2o.no_progress()
 
 # Start an H2O cluster with nthreads = num cores on your machine
 localH2O <-  h2o.init(nthreads = -1)
 
 # Bring data into H2O
 train <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/train.csv", destination_frame = "train")
-test <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/test.csv", destination_frame = "test")
+test  <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/test.csv",  destination_frame = "test")
+
+# Description of A Dataset
+h2o.describe(train)
+
+# Another way to import the data
+# train <- readRDS("~/useR16_ensemble/Data/Derive/train.rds")
+# train <- as.h2o(train, destination_frame = 'train')
+# 
+# test <- readRDS("~/useR16_ensemble/Data/Derive/test.rds")
+# test <- as.h2o(test, destination_frame = 'test')
 
 # Setup Model
 y      <- "TARGET"
@@ -43,41 +59,41 @@ fit <- h2o.ensemble(x = x, y = y,
                     cvControl = list(V = nfolds , shuffle = TRUE))
 
 # Create Cross Validation Function w/ Performance OutperLoop Metric
-h2o_cv <- function(model, K = 3, times = 2, seed = 1000){
+h2o_cv <- function(model, training_frame = train, K = 3, times = 2, seed = 1000){
   
-  model = fit; K = 2; times = 2; seed = 1000;
-  d <- train
+  dd <- training_frame
   set.seed(seed)
-  ind <- caret::createMultiFolds(as.vector(d[,model$y]), k = K, times = times)
-  out <- vector("list", length(ind))
-  names(out) <- names(ind)
+  ix <- caret::createMultiFolds(as.vector(dd[,model$y]), k = K, times = times)
+  ot <- vector("list", length(ix))
+  names(ot) <- names(ix)
   
-  for (j in 1:length(ind)){
-    print(paste0("Begin outer cross-validation loop: ", j, " of ", K*times))
-    t <- d[ ind[[j]],]
-    v <- d[-ind[[j]],]
+  for (j in 1:length(ix)){
+    print(paste0("Begin outer cross-validation : ",names(ot)[j]))
+    tt <- dd[ ix[[j]],]
+    vv <- dd[-ix[[j]],]
     # fit the ensemble
-    f <- h2o.ensemble(x = model$x, y = model$y,
-                      training_frame = t,
+    ff <- h2o.ensemble(x = model$x, y = model$y,
+                      training_frame = tt,
                       family   = model$family,
                       learner  = model$learner,
                       metalearner = model$metalearner,
                       cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))
+    print(paste0("End outer cross-validation : ",names(ot)[j]," ",round(as.vector(fit$runtime$total),1)," ","seconds"))
     # Predict on validation set
-    out[[j]] <- h2o.ensemble_performance(f, newdata = v, score_base_models = FALSE)$ensemble
+    ot[[j]] <- h2o.ensemble_performance(ff, newdata = vv, score_base_models = FALSE)$ensemble
   }
-  return(out)
+  return(ot)
 }
 
-fit_cv  <- h2o_cv(model = fit, K = 2, times = 2, seed = 1000)
+fit_cv  <- h2o_cv(model = fit, training_frame = train, K = 2, times = 1, seed = 1000)
 
 names(fit_cv[[1]]@metrics)
 fit_cv[[1]]@metrics$AUC
 AUC  <- sapply(seq(length(fit_cv)), function(l)  fit_cv[[l]]@metrics$AUC)
 AUC
-# out[[1]]@metrics$thresholds_and_metric_scores
-# out[[1]]@metrics$max_criteria_and_metric_scores
+# fit_cv[[1]]@metrics$thresholds_and_metric_scores
+# fit_cv[[1]]@metrics$max_criteria_and_metric_scores
 
 # All done, shutdown H2O
-# h2o.shutdown(prompt=FALSE)
+h2o.shutdown(prompt=FALSE)
 
