@@ -17,9 +17,12 @@ localH2O <-  h2o.init(nthreads = -1)
 train <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/train.csv", destination_frame = "train")
 test  <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/test.csv",  destination_frame = "test")
 
+<<<<<<< HEAD
 # Description of A Dataset
 h2o.describe(train)
 
+=======
+>>>>>>> daacb707a787ff9dd2097977afb1c2880cab656a
 # Another way to import the data
 # train <- readRDS("~/useR16_ensemble/Data/Derive/train.rds")
 # train <- as.h2o(train, destination_frame = 'train')
