@@ -17,12 +17,9 @@ localH2O <-  h2o.init(nthreads = -1)
 train <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/train.csv", destination_frame = "train")
 test  <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/test.csv",  destination_frame = "test")
 
-<<<<<<< HEAD
 # Description of A Dataset
-h2o.describe(train)
+# h2o.describe(train)
 
-=======
->>>>>>> daacb707a787ff9dd2097977afb1c2880cab656a
 # Another way to import the data
 # train <- readRDS("~/useR16_ensemble/Data/Derive/train.rds")
 # train <- as.h2o(train, destination_frame = 'train')
@@ -67,11 +64,11 @@ h2o_cv <- function(model, training_frame = train, K = 3, times = 2, seed = 1000)
   dd <- training_frame
   set.seed(seed)
   ix <- caret::createMultiFolds(as.vector(dd[,model$y]), k = K, times = times)
-  ot <- vector("list", length(ix))
-  names(ot) <- names(ix)
+  ft <- vector("list", length(ix))
+  names(ft) <- names(ix)
   
   for (j in 1:length(ix)){
-    print(paste0("Begin outer cross-validation : ",names(ot)[j]))
+    print(paste0("Begin outer cross-validation : ",names(ft)[j]))
     tt <- dd[ ix[[j]],]
     vv <- dd[-ix[[j]],]
     # fit the ensemble
@@ -81,22 +78,23 @@ h2o_cv <- function(model, training_frame = train, K = 3, times = 2, seed = 1000)
                       learner  = model$learner,
                       metalearner = model$metalearner,
                       cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))
-    print(paste0("End outer cross-validation : ",names(ot)[j]," ",round(as.vector(fit$runtime$total),1)," ","seconds"))
+    print(paste0("End outer cross-validation : ",names(ft)[j]," ",round(as.vector(fit$runtime$total),1)," ","seconds"))
     # Predict on validation set
-    ot[[j]] <- h2o.ensemble_performance(ff, newdata = vv, score_base_models = FALSE)$ensemble
+    ft[[j]] <- ff
   }
-  return(ot)
+  return(ft)
 }
 
-fit_cv  <- h2o_cv(model = fit, training_frame = train, K = 2, times = 1, seed = 1000)
+fit_cv  <- h2o_cv(model = fit, training_frame = train, K = 5, times = 3, seed = 1000)
 
-names(fit_cv[[1]]@metrics)
-fit_cv[[1]]@metrics$AUC
-AUC  <- sapply(seq(length(fit_cv)), function(l)  fit_cv[[l]]@metrics$AUC)
-AUC
+# ft[[j]] <- h2o.ensemble_performance(ff, newdata = vv, score_base_models = FALSE)$ensemble
+# names(fit_cv[[1]]@metrics)
+# fit_cv[[1]]@metrics$AUC
+# AUC  <- sapply(seq(length(fit_cv)), function(l)  fit_cv[[l]]@metrics$AUC)
+# AUC
 # fit_cv[[1]]@metrics$thresholds_and_metric_scores
 # fit_cv[[1]]@metrics$max_criteria_and_metric_scores
 
 # All done, shutdown H2O
-h2o.shutdown(prompt=FALSE)
+# h2o.shutdown(prompt=FALSE)
 
