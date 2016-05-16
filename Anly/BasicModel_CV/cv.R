@@ -80,12 +80,32 @@ h2o_cv <- function(model, training_frame = train, K = 3, times = 2, seed = 1000)
                       cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))
     print(paste0("End outer cross-validation : ",names(ft)[j]," ",round(as.vector(fit$runtime$total),1)," ","seconds"))
     # Predict on validation set
+    ff$tt_ind <- ix[[j]]
     ft[[j]] <- ff
   }
   return(ft)
 }
 
-fit_cv  <- h2o_cv(model = fit, training_frame = train, K = 5, times = 3, seed = 1000)
+fit_cv  <- h2o_cv(model = fit, training_frame = train, K = 5, times = 2, seed = 1000)
+
+
+
+library(dplyr)
+library(tidyr)
+library(purrr)
+perf <- fit_cv %>% map(~h2o.ensemble_performance(., newdata=train[-.$tt_ind,], score_base_models=F)$ensemble)
+
+extract_perf <- function(perf) {
+  print(perf@metrics)
+}
+perf %>% map(~extract_perf(.))
+
+
+perf[1][[1]]@metrics$AUC
+perf[1][[1]]@metrics$thresholds_and_metric_scores
+perf[1][[1]]@metrics$max_criteria_and_metric_scores
+
+
 
 # ft[[j]] <- h2o.ensemble_performance(ff, newdata = vv, score_base_models = FALSE)$ensemble
 # names(fit_cv[[1]]@metrics)
@@ -98,3 +118,4 @@ fit_cv  <- h2o_cv(model = fit, training_frame = train, K = 5, times = 3, seed = 
 # All done, shutdown H2O
 # h2o.shutdown(prompt=FALSE)
 
+ft <- map(fit_cv, )
