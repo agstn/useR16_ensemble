@@ -4,7 +4,7 @@
 # 3- Add a parameter to processed different metalernears
 
 # Package: Requires version >=0.1.8 of h2oEnsemble 
-pacman::p_load(h2oEnsemble, dplyr, tidyr, purrr)
+pacman::p_load(h2oEnsemble)
 
 # Suppress warnings
 options(warn=-1)
@@ -58,71 +58,61 @@ fit <- h2o.ensemble(x = x, y = y,
                     metalearner = "h2o.glm_nn",
                     cvControl = list(V = nfolds , shuffle = TRUE))
 
+library(purrr)
+library(dplyr)
+library(tidyr)
+
+dd <-train
+K <- 2 
+times <- 3
+metalearner <- 'h2o.glm_nn'
+model <- fit
+
 # Create Cross Validation Function w/ Performance OutperLoop Metric
-h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, seed = 1000){
+h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, seed = 1000, metalearner=c('h2o.glm_nn')){
   
   dd <- training_frame
   set.seed(seed)
-  ix <- caret::createMultiFolds(as.vector(dd[,model$y]), k = K, times = times)
-  ft <- vector("list", length(ix))
-  names(ft) <- names(ix)
   
-  for (j in 1:length(ix)){
-    print(paste0("Begin outer cross-validation : ",names(ft)[j]))
-    tt <- dd[ ix[[j]],]
-    vv <- dd[-ix[[j]],]
-    # fit the ensemble
-    ff <- h2o.ensemble(x = model$x, y = model$y,
-                      training_frame = tt,
-                      family   = model$family,
-                      learner  = model$learner,
-                      metalearner = model$metalearner,
-                      cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))
-    print(paste0("End outer cross-validation : ",names(ft)[j]," ",round(as.vector(fit$runtime$total),1)," ","seconds"))
-    # Predict on validation set
-    ff$tt_ind <- ix[[j]]
-    ft[[j]] <- ff
-  }
-  return(ft)
+  ix <- caret::createMultiFolds(as.vector(dd[,model$y]), k = K, times = times)
+  
+  dr <- data.frame(name=rep(names(ix), length=metalearner), 
+                   metalearner=rep(metalearner, length(ix))) %>% 
+    group_by(name, metalearner) %>% 
+    nest %>% 
+    select(-data) %>% 
+    mutate(ix = ix,
+           ft = map(ix, ~h2o.ensemble(x = model$x, y = model$y,
+                                      training_frame = dd[.,],
+                                      family   = model$family,
+                                      learner  = model$learner,
+                                      metalearner = model$metalearner,
+                                      cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))))
+  return(dr)
 }
-
-fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 5, times = 2, seed = 1000)
+fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 3, times = 1, seed = 1000)
 
 
 ### metalearn cv function
-h2o.metalearn_cv <- function(model_cv = fit_cv, newmetalearner = c('h2o.glm.wrapper'), seed = 1){
-  fit_cv %>% map(~h2o.metalearn(., metalearner=newmetalearner))
+h2o.metalearn_cv <- function(model_cv = fit_cv, metalearner = c('h2o.glm_nn'), seed = 1){
+  fit_cv %>% mutate(newfit = map(~h2o.metalearn(., metalearner=metalearner)))
 }
-fit_cv_new <- h2o.metalearn_cv(fit_cv)
-
+h2o.metalearn()
 
 ### performance cv function
 h2o.ensemble_performance_cv <- function(model_cv = fit_cv, training_frame=train){
-    p1 <- model_cv %>% map(~h2o.ensemble_performance(., newdata=train[-.$tt_ind,], score_base_models=F)$ensemble)
-    return(p1)
+  p1 <- fit_cv %>% mutate(perf = map2(ft, ix, ~h2o.ensemble_performance(.x, newdata=train[-.y,], score_base_models=F)$ensemble))
+  return(p1)
+}
+p <- h2o.ensemble_performance_cv(fit_cv, train)
+
+p$perf %>%  
+  lapply(function(x) x@metrics)
+
+for (i in 1:3){
+  print(p$perf[[i]])
 }
 
 
 
-
-
-
-
-
-# perf[1][[1]]@metrics$AUC
-# perf[1][[1]]@metrics$MSE
-# perf[1][[1]]@metrics$r2
-# perf[1][[1]]@metrics$thresholds_and_metric_scores
-# perf[1][[1]]@metrics$max_criteria_and_metric_scores
-
-# ft[[j]] <- h2o.ensemble_performance(ff, newdata = vv, score_base_models = FALSE)$ensemble
-# names(fit_cv[[1]]@metrics)
-# fit_cv[[1]]@metrics$AUC
-# AUC  <- sapply(seq(length(fit_cv)), function(l)  fit_cv[[l]]@metrics$AUC)
-# AUC
-# fit_cv[[1]]@metrics$thresholds_and_metric_scores
-# fit_cv[[1]]@metrics$max_criteria_and_metric_scores
-
-# All done, shutdown H2O
-# h2o.shutdown(prompt=FALSE)
 
