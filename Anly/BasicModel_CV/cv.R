@@ -4,7 +4,7 @@
 # 3- Add a parameter to processed different metalernears
 
 # Package: Requires version >=0.1.8 of h2oEnsemble 
-pacman::p_load(h2oEnsemble, dplyr, tidyr, purrr)
+pacman::p_load(h2oEnsemble, dplyr, tidyr, purrr,lattice)
 
 # Suppress warnings
 options(warn=-1)
@@ -78,35 +78,55 @@ h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, see
                       learner  = model$learner,
                       metalearner = model$metalearner,
                       cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))
-    print(paste0("End outer cross-validation : ",names(ft)[j]," ",round(as.vector(fit$runtime$total),1)," ","seconds"))
+    #print(paste0("End outer cross-validation : ",names(ft)[j]," ",round(as.vector(fit$runtime$total),1)," ","seconds"))
     # Predict on validation set
     ff$tt_ind <- ix[[j]]
     ft[[j]] <- ff
   }
+  names(ft) <- paste0(names(ft), '__', model$metalearner)
   return(ft)
 }
 
 fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 5, times = 2, seed = 1000)
 
-
 ### metalearn cv function
 h2o.metalearn_cv <- function(model_cv = fit_cv, newmetalearner = c('h2o.glm.wrapper'), seed = 1){
-  fit_cv %>% map(~h2o.metalearn(., metalearner=newmetalearner))
+  model_cv_new <- model_cv %>% map(~h2o.metalearn(., metalearner=newmetalearner))
+  names(model_cv_new) <- paste0(unlist(lapply(strsplit(names(model_cv_new), '_', fixed = TRUE), '[', 1)), '__', newmetalearner)
+  return(model_cv_new)
 }
 fit_cv_new <- h2o.metalearn_cv(fit_cv)
 
+## combine metalearners....should we incorporate this into a new function or previous?
+fit_cv_all <- flatten(list(fit_cv, fit_cv_new)) 
 
 ### performance cv function
 h2o.ensemble_performance_cv <- function(model_cv = fit_cv, training_frame=train){
     p1 <- model_cv %>% map(~h2o.ensemble_performance(., newdata=train[-.$tt_ind,], score_base_models=F)$ensemble)
     return(p1)
 }
+perf_cv <- h2o.ensemble_performance_cv(fit_cv_all, train)
 
+### example summary function
+getAUC <- function(perf_cv = perf_cv, plot=T){
+  AUC <-lapply(perf_cv, function(x) x@metrics$AUC)
+  AUCdat <- data.frame(model = names(AUC), AUC=unlist(AUC), row.names=NULL) %>% 
+    separate(model, c('CV','Metalearner'), sep='__')
+  
+  if (plot==T){
+    print(
+      stripplot(AUC~Metalearner, data=AUCdat,
+                         panel=function(x,y,...){
+                           panel.stripplot(x,y,...)
+                           panel.segments(x0=as.numeric(x)-0.1, x1=as.numeric(x)+0.1,
+                                          y0=median(y), y1=median(y))
+                         })
+    )
+  }
+  return(AUCdat)
+}
 
-
-
-
-
+getAUC(perf_cv)
 
 
 # perf[1][[1]]@metrics$AUC
