@@ -64,11 +64,11 @@ h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, see
   dd <- training_frame
   set.seed(seed)
   ix <- caret::createMultiFolds(as.vector(dd[,model$y]), k = K, times = times)
-  ft <- vector("list", length(ix))
-  names(ft) <- names(ix)
+  out <- vector("list", length(ix))
+  names(out) <- names(ix)
   
   for (j in 1:length(ix)){
-    print(paste0("Begin outer cross-validation : ",names(ft)[j]))
+    print(paste0("Begin outer cross-validation : ",names(out)[j]))
     tt <- dd[ ix[[j]],]
     vv <- dd[-ix[[j]],]
     # fit the ensemble
@@ -78,55 +78,111 @@ h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, see
                       learner  = model$learner,
                       metalearner = model$metalearner,
                       cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))
-    #print(paste0("End outer cross-validation : ",names(ft)[j]," ",round(as.vector(fit$runtime$total),1)," ","seconds"))
+    print(paste0("End outer cross-validation : ",names(out)[j]," ",round(as.vector(ff$runtime$total),1)," ","seconds"))
     # Predict on validation set
     ff$tt_ind <- ix[[j]]
-    ft[[j]] <- ff
+    ff$folds <- K
+    ff$repeats <- times
+    out[[j]] <- ff
   }
-  names(ft) <- paste0(names(ft), '__', model$metalearner)
-  return(ft)
+  names(out) <- paste0(names(out), '__', model$metalearner)
+  class(out) <- "h2o.ensemble_cv"
+  return(out)
 }
 
-fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 5, times = 2, seed = 1000)
+fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 3, times = 1, seed = 1000)
+
 
 ### metalearn cv function
-h2o.metalearn_cv <- function(model_cv = fit_cv, newmetalearner = c('h2o.glm.wrapper'), seed = 1){
-  model_cv_new <- model_cv %>% map(~h2o.metalearn(., metalearner=newmetalearner))
-  names(model_cv_new) <- paste0(unlist(lapply(strsplit(names(model_cv_new), '_', fixed = TRUE), '[', 1)), '__', newmetalearner)
-  return(model_cv_new)
+h2o.metalearn_cv <- function(object, metalearner = "h2o.glm.wrapper", seed = 1, keep_levelone_data = TRUE){
+  out <- object %>% map(~h2o.metalearn(., metalearner=metalearner, keep_levelone_data=keep_levelone_data))
+  names(out) <- paste0(unlist(lapply(strsplit(names(out), '_', fixed = TRUE), '[', 1)), '__', metalearner)
+  for(i in 1:length(out)){
+    out[[i]]$metalearner <- metalearner
+  }
+  class(out) <- "h2o.ensemble_cv"
+  return(out)
 }
-fit_cv_new <- h2o.metalearn_cv(fit_cv)
+fit_cv_new <- h2o.metalearn_cv(object=fit_cv)
 
-## combine metalearners....should we incorporate this into a new function or previous?
-fit_cv_all <- flatten(list(fit_cv, fit_cv_new)) 
+
+### print function for class 'h2o.ensemble_cv'
+print.h2o.ensemble_cv <- function(x, ...) {
+  cat("\nH2O Ensemble CV fit")
+  cat("\n----------------")
+  cat("\nfamily: ")
+  cat(x[[1]]$family)
+  cat("\nlearner: ")
+  cat(x[[1]]$learner)
+  cat("\nmetalearner: ")
+  cat(x[[1]]$metalearner)
+  cat("\nRepeated CV: ")
+  cat(x[[1]]$folds,'fold CV repeated',x[[1]]$repeats, ifelse(x[[1]]$repeats<2,'time','times'))
+  cat("\n\n")
+}
+
 
 ### performance cv function
-h2o.ensemble_performance_cv <- function(model_cv = fit_cv, training_frame=train){
-    p1 <- model_cv %>% map(~h2o.ensemble_performance(., newdata=train[-.$tt_ind,], score_base_models=F)$ensemble)
-    return(p1)
+h2o.ensemble_performance_cv <- function(object, training_frame=train, score_base_models=F){
+    out <- object %>% map(~h2o.ensemble_performance(., newdata=train[-.$tt_ind,], score_base_models=score_base_models)$ensemble)
+    class(out) <- "h2o.ensemble_cv_performance"
+    return(out)
 }
-perf_cv <- h2o.ensemble_performance_cv(fit_cv_all, train)
+perf_cv <- h2o.ensemble_performance_cv(fit_cv, train)
 
-### example summary function
-getAUC <- function(perf_cv = perf_cv, plot=T){
-  AUC <-lapply(perf_cv, function(x) x@metrics$AUC)
-  AUCdat <- data.frame(model = names(AUC), AUC=unlist(AUC), row.names=NULL) %>% 
-    separate(model, c('CV','Metalearner'), sep='__')
+
+### print function for class 'h2o.ensemble_cv_performance'
+print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "MSE", "AUC", "r2"), ...) {
   
-  if (plot==T){
-    print(
-      stripplot(AUC~Metalearner, data=AUCdat,
-                         panel=function(x,y,...){
-                           panel.stripplot(x,y,...)
-                           panel.segments(x0=as.numeric(x)-0.1, x1=as.numeric(x)+0.1,
-                                          y0=median(y), y1=median(y))
-                         })
-    )
+  # We limit metrics to those common among all possible base algos
+  metric <- match.arg(metric)
+  if (metric == "AUTO") {
+    if (class(x$ensemble) == "H2OBinomialMetrics") {
+      metric <- "AUC"
+      family <- "binomial"
+    } else {
+      metric <- "MSE"
+      family <- "gaussian"
+    }
   }
-  return(AUCdat)
+  
+  # Base learner test set AUC (for comparison)
+  if (!is.null(x$base)) {
+    learner <- names(x$base)
+    L <- length(learner)
+    base_perf <- sapply(seq(L), function(l) x$base[[l]]@metrics[[metric]])
+    res <- data.frame(learner = learner, base_perf)
+    names(res)[2] <- metric
+    # Sort order for base learner metrics
+    if (metric %in% c("AUC", "r2")) {
+      # Higher AUC/R2, the better
+      decreasing <- FALSE
+    } else {
+      decreasing <- TRUE
+    }
+    cat("\nBase learner performance, sorted by specified metric:\n")
+    res <- res[order(res[, metric], decreasing = decreasing), ]
+    print(res)
+  }
+  cat("\n")
+  
+  # Ensemble test set AUC
+  ensemble_perf <- x$ensemble@metrics[[metric]]
+  
+  cat("\nH2O Ensemble Performance on <newdata>:")
+  cat("\n----------------")
+  cat(paste0("\nFamily: ", family))
+  cat("\n")
+  cat(paste0("\nEnsemble performance (", metric, "): ", ensemble_perf))
+  cat("\n\n")
 }
 
-getAUC(perf_cv)
+
+# https://github.com/h2oai/h2o-3/blob/master/h2o-r/ensemble/h2oEnsemble-package/R/ensemble.R
+# https://github.com/h2oai/h2o-3/blob/master/h2o-r/ensemble/h2oEnsemble-package/R/metalearn.R
+# https://github.com/h2oai/h2o-3/blob/master/h2o-r/ensemble/h2oEnsemble-package/R/performance.R
+
+
 
 
 # perf[1][[1]]@metrics$AUC
@@ -135,13 +191,6 @@ getAUC(perf_cv)
 # perf[1][[1]]@metrics$thresholds_and_metric_scores
 # perf[1][[1]]@metrics$max_criteria_and_metric_scores
 
-# ft[[j]] <- h2o.ensemble_performance(ff, newdata = vv, score_base_models = FALSE)$ensemble
-# names(fit_cv[[1]]@metrics)
-# fit_cv[[1]]@metrics$AUC
-# AUC  <- sapply(seq(length(fit_cv)), function(l)  fit_cv[[l]]@metrics$AUC)
-# AUC
-# fit_cv[[1]]@metrics$thresholds_and_metric_scores
-# fit_cv[[1]]@metrics$max_criteria_and_metric_scores
 
 # All done, shutdown H2O
 # h2o.shutdown(prompt=FALSE)
