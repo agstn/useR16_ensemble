@@ -79,7 +79,7 @@ h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, see
                       metalearner = model$metalearner,
                       cvControl = list(V = model$cvControl$V, shuffle = model$cvControl$shuffle))
     print(paste0("End outer cross-validation : ",names(out)[j]," ",round(as.vector(ff$runtime$total),1)," ","seconds"))
-    # Predict on validation set
+
     ff$tt_ind <- ix[[j]]
     ff$folds <- K
     ff$repeats <- times
@@ -95,7 +95,7 @@ fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 3, times = 1
 
 ### metalearn cv function
 h2o.metalearn_cv <- function(object, metalearner = "h2o.glm.wrapper", seed = 1, keep_levelone_data = TRUE){
-  out <- object %>% map(~h2o.metalearn(., metalearner=metalearner, keep_levelone_data=keep_levelone_data))
+  out <- object %>% map(~h2o.metalearn(., metalearner=metalearner, keep_levelone_data=keep_levelone_data))  ## make into for loop
   names(out) <- paste0(unlist(lapply(strsplit(names(out), '_', fixed = TRUE), '[', 1)), '__', metalearner)
   for(i in 1:length(out)){
     out[[i]]$metalearner <- metalearner
@@ -123,12 +123,12 @@ print.h2o.ensemble_cv <- function(x, ...) {
 
 
 ### performance cv function
-h2o.ensemble_performance_cv <- function(object, training_frame=train, score_base_models=F){
-    out <- object %>% map(~h2o.ensemble_performance(., newdata=train[-.$tt_ind,], score_base_models=score_base_models)$ensemble)
+h2o.ensemble_performance_cv <- function(object, training_frame=train, score_base_models=T){
+    out <- object %>% map(~h2o.ensemble_performance(., newdata=train[-.$tt_ind,], score_base_models=score_base_models))
     class(out) <- "h2o.ensemble_cv_performance"
     return(out)
 }
-perf_cv <- h2o.ensemble_performance_cv(fit_cv, train)
+perf_cv <- h2o.ensemble_performance_cv(fit_cv, train, score_base_models = T)
 
 
 ### print function for class 'h2o.ensemble_cv_performance'
@@ -137,7 +137,7 @@ print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "
   # We limit metrics to those common among all possible base algos
   metric <- match.arg(metric)
   if (metric == "AUTO") {
-    if (class(x$ensemble) == "H2OBinomialMetrics") {
+    if (class(x[[1]]$ensemble) == "H2OBinomialMetrics") {
       metric <- "AUC"
       family <- "binomial"
     } else {
@@ -146,14 +146,23 @@ print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "
     }
   }
   
+  model_names <- unlist(lapply(strsplit(names(x), '_', fixed = TRUE), '[', 1))
+  
   # Base learner test set AUC (for comparison)
-  if (!is.null(x$base)) {
-    learner <- names(x$base)
-    L <- length(learner)
-    base_perf <- sapply(seq(L), function(l) x$base[[l]]@metrics[[metric]])
-    res <- data.frame(learner = learner, base_perf)
-    names(res)[2] <- metric
-    # Sort order for base learner metrics
+  if (!is.null(x[[1]]$base)) {
+    res <- data.frame(model=NA, learner=NA, metric=NA)
+    names(res)[3] <- metric
+    
+    for (i in 1:length(x)){
+      model <- model_names[i]
+      learner <- names(x[[i]]$base)
+      L <- length(learner)
+      base_perf <- sapply(seq(L), function(l) x[[i]]$base[[l]]@metrics[[metric]])
+      res2 <- data.frame(model = model, learner = learner, base_perf)
+      names(res2)[3] <- metric
+      # Sort order for base learner metrics
+      res <- rbind(res, res2)
+    }
     if (metric %in% c("AUC", "r2")) {
       # Higher AUC/R2, the better
       decreasing <- FALSE
@@ -161,35 +170,34 @@ print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "
       decreasing <- TRUE
     }
     cat("\nBase learner performance, sorted by specified metric:\n")
-    res <- res[order(res[, metric], decreasing = decreasing), ]
+    res <- na.omit(res[order(res[, c('model',metric)], decreasing = decreasing), ])
     print(res)
   }
   cat("\n")
   
   # Ensemble test set AUC
-  ensemble_perf <- x$ensemble@metrics[[metric]]
+  metares <- vector(mode='numeric',length=length(x))
   
-  cat("\nH2O Ensemble Performance on <newdata>:")
+  for (i in 1:length(x)){
+    metares[i] <- x[[i]]$ensemble@metrics[[metric]]
+  }
+  ensemble_perf <- mean(metares, na.rm=T)
+  
+  cat("\nH2O Ensemble CV Performance on <newdata>:")
   cat("\n----------------")
   cat(paste0("\nFamily: ", family))
   cat("\n")
-  cat(paste0("\nEnsemble performance (", metric, "): ", ensemble_perf))
+  cat(paste0("\nCross-validation mean ensemble performance (", metric, "): ", ensemble_perf))
   cat("\n\n")
 }
 
 
+
+
+### model codes:
 # https://github.com/h2oai/h2o-3/blob/master/h2o-r/ensemble/h2oEnsemble-package/R/ensemble.R
 # https://github.com/h2oai/h2o-3/blob/master/h2o-r/ensemble/h2oEnsemble-package/R/metalearn.R
 # https://github.com/h2oai/h2o-3/blob/master/h2o-r/ensemble/h2oEnsemble-package/R/performance.R
-
-
-
-
-# perf[1][[1]]@metrics$AUC
-# perf[1][[1]]@metrics$MSE
-# perf[1][[1]]@metrics$r2
-# perf[1][[1]]@metrics$thresholds_and_metric_scores
-# perf[1][[1]]@metrics$max_criteria_and_metric_scores
 
 
 # All done, shutdown H2O
