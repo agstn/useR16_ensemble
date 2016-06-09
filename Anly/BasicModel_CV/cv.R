@@ -4,7 +4,8 @@
 # 3- Add a parameter to processed different metalernears
 
 # Package: Requires version >=0.1.8 of h2oEnsemble 
-pacman::p_load(h2oEnsemble, dplyr, tidyr, purrr,lattice)
+pacman::p_load(h2oEnsemble)
+#, dplyr, tidyr)
 
 # Suppress warnings
 options(warn=-1)
@@ -17,15 +18,6 @@ localH2O <-  h2o.init(nthreads = -1)
 train <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/train.csv", destination_frame = "train")
 test  <- h2o.uploadFile(path = "~/useR16_ensemble/Data/Raw/test.csv",  destination_frame = "test")
 
-# Description of A Dataset
-# h2o.describe(train)
-
-# Another way to import the data
-# train <- readRDS("~/useR16_ensemble/Data/Derive/train.rds")
-# train <- as.h2o(train, destination_frame = 'train')
-# 
-# test <- readRDS("~/useR16_ensemble/Data/Derive/test.rds")
-# test <- as.h2o(test, destination_frame = 'test')
 
 # Setup Model
 y      <- "TARGET"
@@ -85,7 +77,6 @@ h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, see
     ff$repeats <- times
     out[[j]] <- ff
   }
-  names(out) <- paste0(names(out), '__', model$metalearner)
   class(out) <- "h2o.ensemble_cv"
   return(out)
 }
@@ -95,9 +86,9 @@ fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 3, times = 1
 
 ### metalearn cv function
 h2o.metalearn_cv <- function(object, metalearner = "h2o.glm.wrapper", seed = 1, keep_levelone_data = TRUE){
-  out <- object %>% map(~h2o.metalearn(., metalearner=metalearner, keep_levelone_data=keep_levelone_data))  ## make into for loop
-  names(out) <- paste0(unlist(lapply(strsplit(names(out), '_', fixed = TRUE), '[', 1)), '__', metalearner)
-  for(i in 1:length(out)){
+  out <- vector("list", length(object))
+  for (i in 1:length(out)){
+    out[[i]] <- h2o.metalearn(object[[i]], metalearner=metalearner, keep_levelone_data=keep_levelone_data)
     out[[i]]$metalearner <- metalearner
   }
   class(out) <- "h2o.ensemble_cv"
@@ -124,7 +115,11 @@ print.h2o.ensemble_cv <- function(x, ...) {
 
 ### performance cv function
 h2o.ensemble_performance_cv <- function(object, training_frame=train, score_base_models=T){
-    out <- object %>% map(~h2o.ensemble_performance(., newdata=train[-.$tt_ind,], score_base_models=score_base_models))
+    out <- vector("list", length(object))
+    for (i in 1:length(out)){
+      out[[i]] <- h2o.ensemble_performance(object[[i]], newdata=train[-object[[i]]$tt_ind,], score_base_models=score_base_models)
+    }
+    names(out) <- names(object)
     class(out) <- "h2o.ensemble_cv_performance"
     return(out)
 }
@@ -146,15 +141,13 @@ print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "
     }
   }
   
-  model_names <- unlist(lapply(strsplit(names(x), '_', fixed = TRUE), '[', 1))
-  
   # Base learner test set AUC (for comparison)
   if (!is.null(x[[1]]$base)) {
     res <- data.frame(model=NA, learner=NA, metric=NA)
     names(res)[3] <- metric
     
     for (i in 1:length(x)){
-      model <- model_names[i]
+      model <- names(x)[i]
       learner <- names(x[[i]]$base)
       L <- length(learner)
       base_perf <- sapply(seq(L), function(l) x[[i]]$base[[l]]@metrics[[metric]])
