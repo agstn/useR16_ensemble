@@ -81,7 +81,7 @@ h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, see
   return(out)
 }
 
-fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 3, times = 1, seed = 1000)
+fit_cv  <- h2o.ensemble_cv(model = fit, training_frame = train, K = 3, times = 2, seed = 1000)
 
 
 ### metalearn cv function
@@ -169,18 +169,30 @@ print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "
   cat("\n")
   
   # Ensemble test set AUC
-  metares <- vector(mode='numeric',length=length(x))
+  metares <- data.frame(Repeat=NA, metric=NA)
+  row <- 1
+  reps <- sapply(stringr::str_split(names(x), "\\."),"[", 2)
   
   for (i in 1:length(x)){
-    metares[i] <- x[[i]]$ensemble@metrics[[metric]]
+    Repeat <- reps[i]
+    perf <- x[[i]]$ensemble@metrics[[metric]]
+    metares[row, 'Repeat'] <- Repeat
+    metares[row, 'metric'] <- perf
+    
+    row <- row + 1
   }
-  ensemble_perf <- mean(metares, na.rm=T)
+  metares <- aggregate(metares$metric, list(metares$Repeat), mean)
+  names(metares) <- c('repeat',paste0('mean ',metric))
+  
+  ensemble_perf <- mean(metares[,2], na.rm=T)
   
   cat("\nH2O Ensemble CV Performance on <newdata>:")
   cat("\n----------------")
   cat(paste0("\nFamily: ", family))
   cat("\n")
-  cat(paste0("\nCross-validation mean ensemble performance (", metric, "): ", ensemble_perf))
+  cat("\nK-fold cross validation mean performance:\n")
+  print(metares)
+  cat(paste0("\nRepeated K-fold cross-validation mean ensemble performance (", metric, "): ", ensemble_perf))
   cat("\n\n")
 }
 
