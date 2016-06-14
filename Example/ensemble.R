@@ -49,6 +49,7 @@ perf
 
 # Train with new Metalearner
 nfit <- h2o.metalearn(fit, metalearner = "h2o.deeplearning.wrapper")
+
 # test Performance with new Metalerner
 nperf <- h2o.ensemble_performance(nfit, newdata = test)
 nperf 
