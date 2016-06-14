@@ -91,6 +91,7 @@ h2o.metalearn_cv <- function(object, metalearner = "h2o.glm.wrapper", seed = 1, 
     out[[i]] <- h2o.metalearn(object[[i]], metalearner=metalearner, keep_levelone_data=keep_levelone_data)
     out[[i]]$metalearner <- metalearner
   }
+  names(out) <- names(object)
   class(out) <- "h2o.ensemble_cv"
   return(out)
 }
@@ -123,7 +124,7 @@ h2o.ensemble_performance_cv <- function(object, training_frame=train, score_base
     class(out) <- "h2o.ensemble_cv_performance"
     return(out)
 }
-perf_cv <- h2o.ensemble_performance_cv(fit_cv, train, score_base_models = T)
+perf_cv <- h2o.ensemble_performance_cv(fit_cv_new, train, score_base_models = T)
 
 
 ### print function for class 'h2o.ensemble_cv_performance'
@@ -144,18 +145,17 @@ print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "
   # Base learner test set AUC (for comparison)
   if (!is.null(x[[1]]$base)) {
     res <- data.frame(model=NA, learner=NA, metric=NA)
-    names(res)[3] <- metric
     
     for (i in 1:length(x)){
       model <- names(x)[i]
       learner <- names(x[[i]]$base)
       L <- length(learner)
       base_perf <- sapply(seq(L), function(l) x[[i]]$base[[l]]@metrics[[metric]])
-      res2 <- data.frame(model = model, learner = learner, base_perf)
-      names(res2)[3] <- metric
+      res2 <- data.frame(model = model, learner = learner, metric = base_perf)
       # Sort order for base learner metrics
       res <- rbind(res, res2)
     }
+    names(res)[3] <- metric
     if (metric %in% c("AUC", "r2")) {
       # Higher AUC/R2, the better
       decreasing <- FALSE

@@ -27,18 +27,17 @@ print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "
   # Base learner test set AUC (for comparison)
   if (!is.null(x[[1]]$base)) {
     res <- data.frame(model=NA, learner=NA, metric=NA)
-    names(res)[3] <- metric
     
     for (i in 1:length(x)){
       model <- names(x)[i]
       learner <- names(x[[i]]$base)
       L <- length(learner)
       base_perf <- sapply(seq(L), function(l) x[[i]]$base[[l]]@metrics[[metric]])
-      res2 <- data.frame(model = model, learner = learner, base_perf)
-      names(res2)[3] <- metric
+      res2 <- data.frame(model = model, learner = learner, metric = base_perf)
       # Sort order for base learner metrics
       res <- rbind(res, res2)
     }
+    names(res)[3] <- metric
     if (metric %in% c("AUC", "r2")) {
       # Higher AUC/R2, the better
       decreasing <- FALSE
@@ -78,3 +77,4 @@ print.h2o.ensemble_cv_performance <- function(x, metric = c("AUTO", "logloss", "
   cat(paste0("\nRepeated K-fold cross-validation mean ensemble performance (", metric, "): ", ensemble_perf))
   cat("\n\n")
 }
+
