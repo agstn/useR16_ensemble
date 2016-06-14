@@ -13,7 +13,7 @@
 #'         number_sections: false
 #' ---
 
-library(h2oEnsemble)
+library(h2oEnsemble) 
 h2o.no_progress()
 localH2O <-  h2o.init(nthreads = -1)
 
