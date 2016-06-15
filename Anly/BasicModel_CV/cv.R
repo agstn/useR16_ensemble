@@ -124,7 +124,7 @@ h2o.ensemble_performance_cv <- function(object, training_frame=train, score_base
     class(out) <- "h2o.ensemble_cv_performance"
     return(out)
 }
-perf_cv <- h2o.ensemble_performance_cv(fit_cv_new, train, score_base_models = T)
+perf_cv <- h2o.ensemble_performance_cv(fit_cv_new, train, score_base_models = F)
 
 
 ### print function for class 'h2o.ensemble_cv_performance'

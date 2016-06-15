@@ -4,6 +4,7 @@ h2o.metalearn_cv <- function(object, metalearner = "h2o.glm.wrapper", seed = 1, 
     out[[i]] <- h2o.metalearn(object[[i]], metalearner=metalearner, keep_levelone_data=keep_levelone_data)
     out[[i]]$metalearner <- metalearner
   }
+  names(out) <- names(object)
   class(out) <- "h2o.ensemble_cv"
   return(out)
 }
