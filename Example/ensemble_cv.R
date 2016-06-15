@@ -18,9 +18,9 @@ h2o.no_progress()
 localH2O <-  h2o.init(nthreads = -1)
 
 # load files
-source("C:/Git/useR16_ensemble/R/performance_cv.R")
-source("C:/Git/useR16_ensemble/R/metalearn_cv.R")
-source("C:/Git/useR16_ensemble/R/ensemble_cv.R")
+source("/home/acalatroni/useR16_ensemble/R/performance_cv.R")
+source("/home/acalatroni/useR16_ensemble/R/metalearn_cv.R")
+source("/home/acalatroni/useR16_ensemble/R/ensemble_cv.R")
 
 # Import a sample binary outcome train/test set into R
 train <- h2o.importFile("http://www.stat.berkeley.edu/~ledell/data/higgs_10k.csv")
