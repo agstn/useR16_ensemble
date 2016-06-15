@@ -14,8 +14,8 @@
 #' ---
  
 library(h2oEnsemble)
-h2o.no_progress()
 localH2O <-  h2o.init(nthreads = -1)
+h2o.no_progress()
 
 # Import a sample binary outcome train/test set into R
 train <- h2o.importFile("http://www.stat.berkeley.edu/~ledell/data/higgs_10k.csv")
