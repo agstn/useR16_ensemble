@@ -1,7 +1,7 @@
 h2o.ensemble_performance_cv <- function(object, training_frame=train, score_base_models=T){
   out <- vector("list", length(object))
   for (i in 1:length(out)){
-    out[[i]] <- h2o.ensemble_performance(object[[i]], newdata=train[-object[[i]]$tt_ind,], score_base_models=score_base_models)
+    out[[i]] <- h2o.ensemble_performance(object[[i]], newdata=training_frame[-object[[i]]$tt_ind,], score_base_models=score_base_models)
   }
   names(out) <- names(object)
   class(out) <- "h2o.ensemble_cv_performance"
