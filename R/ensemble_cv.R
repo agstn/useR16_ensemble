@@ -1,11 +1,19 @@
-h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, seed = 1000){
+# Currently, requiring training frame as a separate argument in function
+# To do: extract training frame from model (H2O Ensemble object) and remove this argument
+h2o.ensemble_cv <- function(model, training_frame = train, K = 3, times = 2, seed = 1){
   
   dd <- training_frame
+  
+  # Generate indices for partitioning data into train/test (taking distribution of outcome into account)
+  # for each fold & repeat
   set.seed(seed)
   ix <- caret::createMultiFolds(as.vector(dd[,model$y]), k = K, times = times)
+  
+  # create list to fill with results
   out <- vector("list", length(ix))
   names(out) <- names(ix)
   
+  # Run the ensemble for each fold/repeat and store in the list
   for (j in 1:length(ix)){
     print(paste0("Begin outer cross-validation : ",names(out)[j]))
     tt <- dd[ ix[[j]],]
