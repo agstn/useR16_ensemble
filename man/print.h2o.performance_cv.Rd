@@ -22,9 +22,7 @@
 }
 
 \author{
-Rebecca Z. Krouse \email{rebecca_krouse@rhoworld.com}
-
-Agustin Calatroni \email{agustin_calatroni@rhoworld.com}
+Rebecca Z. Krouse, Agustin Calatroni 
 }
 
 \seealso{
