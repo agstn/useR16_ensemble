@@ -34,15 +34,12 @@ Spencer Aiello, Tom Kraljevic, Petr Maj and with contributions from the H2O.ai t
 Erin LeDell (2016). h2oEnsemble: H2O Ensemble Learning. R package version 0.1.6. \url{https://github.com/h2oai/h2o-3/tree/master/h2o-r/ensemble/h2oEnsemble-package}
 }
 \author{
-Rebecca Z. Krouse \email{rebecca_krouse@rhoworld.com}
-
-Agustin Calatroni \email{agustin_calatroni@rhoworld.com}
+Rebecca Z. Krouse, Agustin Calatroni 
 }
 
 \seealso{
 \code{\link[h2oEnsemble:h2o.ensemble]{h2o.ensemble}},
-\code{\link[h2oEnsemble:h2o.ensemble]{h2o.metalearn_cv}},
-\code{\link[h2oEnsemble:h2o.ensemble]{h2o.performance_cv}}
+\code{\link[h2oEnsemble:h2o.ensemble]{h2o.metalearn_cv}}
 }
 \examples{
 # See h2o.ensemble_cv documentation for an example.
