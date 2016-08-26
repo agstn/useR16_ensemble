@@ -38,7 +38,7 @@ Rebecca Z. Krouse, Agustin Calatroni
 }
 
 \seealso{
-\code{\link[h2oEnsemble:h2o.ensemble]{h2o.ensemble}},
+\code{\link[h2oEnsemble:h2o.ensemble]{h2o.ensemble_cv}},
 \code{\link[h2oEnsemble:h2o.ensemble]{h2o.metalearn_cv}}
 }
 \examples{
