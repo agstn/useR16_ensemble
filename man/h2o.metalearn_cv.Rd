@@ -40,14 +40,11 @@ Erin LeDell (2016). h2oEnsemble: H2O Ensemble Learning. R package version 0.1.6.
 }
 
 \author{
-Rebecca Z. Krouse \email{rebecca_krouse@rhoworld.com}
-
-Agustin Calatroni \email{agustin_calatroni@rhoworld.com}
+Rebecca Z. Krouse, Agustin Calatroni 
 }
 
 \seealso{
 \code{\link[h2oEnsemble:h2o.ensemble]{h2o.ensemble_cv}},
-\code{\link[h2oEnsemble:h2o.ensemble]{h2o.metalearn_cv}},
 \code{\link[h2oEnsemble:h2o.ensemble]{h2o.performance_cv}}
 }
 
